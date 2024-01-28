@@ -3043,7 +3043,7 @@ def get_answer_list_from_user_guess_string(config_dict):
     return local_array + online_array
 
 def ticketmaster_promo(driver, config_dict, fail_list):
-    question_selector = '#promoBox'
+    question_selector = '#promoBox' # TODO: Failed to detect, causes infinite loop
     return tixcraft_input_check_code(driver, config_dict, fail_list, question_selector)
 
 def tixcraft_verify(driver, config_dict, fail_list):
@@ -7403,6 +7403,22 @@ def hkticketing_login(driver, account, password):
 
     return ret
 
+def ticketmastersg_login(driver, account, password):
+    # print(driver.find_element(By.XPATH, '//input[@name="username"]')) #signInFormUsername
+    initial_size = driver.get_window_size()
+    initial_height = initial_size.get('height')
+    initial_width = initial_size.get('width')
+
+    driver.set_window_size(200, 500) #set small to login
+    
+    is_email_sent = assign_text(driver, By.XPATH, '//input[@name="username"]', account)
+    is_password_sent = False
+    if is_email_sent:
+        is_password_sent = assign_text(driver, By.XPATH, '//input[@name="password"]', password, submit=True)
+        driver.set_window_size(initial_width, initial_height) #set small to login
+
+    return is_password_sent
+
 def play_sound_while_ordering(config_dict):
     if config_dict["advanced"]["play_captcha_sound"]["enable"]:
         app_root = get_app_root()
@@ -7814,6 +7830,17 @@ def tixcraft_main(driver, url, config_dict, tixcraft_dict, ocr, Captcha_Browser)
                 sys.exit()
     else:
         tixcraft_dict["is_popup_checkout"] = False
+    
+        kktix_account = config_dict["advanced"]["kktix_account"]
+
+    # is_url_contain_sign_in = False
+    # fix https://kktix.com/users/sign_in?back_to=https://kktix.com/events/xxxx and registerStatus: SOLD_OUT cause page refresh.
+    if 'main.login.ticketmaster.sg/login?' in url:
+        # if len(kktix_account) > 4:
+        ticketmastersg_login(driver, kktix_account, decryptMe(config_dict["advanced"]["kktix_password"]))
+        # is_url_contain_sign_in = True
+
+    # if not is_url_contain_sign_in:
 
     return tixcraft_dict
 
