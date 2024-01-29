@@ -28,6 +28,7 @@ from selenium.common.exceptions import (NoAlertPresentException,
                                         WebDriverException)
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.actions.wheel_input import ScrollOrigin
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
@@ -12293,6 +12294,94 @@ def ticketplus_main(driver, url, config_dict, ocr, Captcha_Browser, ticketplus_d
 
     return ticketplus_dict
 
+def bms_main(driver, url, config_dict, bms_dict):
+    bms_account = config_dict["advanced"]["kktix_account"]
+
+    # https://my.bookmyshow.com/booking/IVE24MYS
+    if ('/booking/' in url) and (not '/quantity' in url) and (not '/seats' in url):
+            try:
+                tnc_dialog_body = driver.find_element(By.CSS_SELECTOR, '.rc-dialog-body')
+                if not tnc_dialog_body is None:
+                    tnc_dialog_body_desc = tnc_dialog_body.find_element(By.CSS_SELECTOR, ':first-child')
+                    tnc_dialog_body_btn = tnc_dialog_body.find_element(By.CSS_SELECTOR, ':last-child > button')
+                    # 1.1 scroll dialog to bottom if btn disabled - START
+                    if tnc_dialog_body_btn.is_enabled() is False:
+                        max_to_scroll = tnc_dialog_body_desc.get_property("scrollHeight")
+                        scroll_origin = ScrollOrigin.from_element(tnc_dialog_body_desc)
+                        ActionChains(driver).scroll_from_origin(scroll_origin, 0, max_to_scroll).perform()
+                    # 1.1 scroll dialog to bottom if btn disabled  - END
+                    # 1.2 click "ACCEPT" button - START
+                    else:
+                        tnc_dialog_body_btn.click()
+                    # 1.2 click "ACCEPT" button - END
+            except Exception as exc:
+                print("find .rc-dialog-body fail")
+    
+    # https://my.bookmyshow.com/booking/IVE24MYS/quantity
+    if '/booking/' and '/quantity' in url:
+            try:
+                # 2.1 input quantity - START
+                qty_stepper_input_query = '.bigtix-quantity-stepper__quantity > input'
+                assign_text(driver, By.CSS_SELECTOR, qty_stepper_input_query, str(config_dict["ticket_number"]), overwrite_when="1") # default value is min=1
+                # 2.1 input quantity - END
+
+                
+                # 2.2 input promo code (optional) - START
+                # qty_stepper_input_query = '.bigtix-quantity-stepper__quantity > input'
+                # assign_text(driver, By.CSS_SELECTOR, qty_stepper_input_query, str(config_dict["ticket_number"])) 
+                # 2.2 input promo code (optional) - END
+
+                # 2.3 confirm quantity - START
+                confirm_qty_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-pagenav-next-container > button')
+                confirm_qty_btn.click()
+                # 2.3 input quantity - END
+
+            except Exception as exc:
+                print("find .bigtix-quantity-stepper__quantity fail")
+    
+    # https://my.bookmyshow.com/booking/IVE24MYS/seats
+    if '/booking/' and '/seats' in url:
+            try:
+                # 3.1 get list of category - START
+                cat_list = driver.find_elements(By.CSS_SELECTOR, '.bigtix-booking-category-fulllist > li')
+                for cat in cat_list:
+                    cat_div = cat.find_element(By.CSS_SELECTOR, 'div')
+                    if cat_div.is_enabled() is True:
+                        cat_name = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__body> .bigtix-card__main > .bigtix-card__title')
+                        cat_price = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__footer> .bigtix-price-display > b')
+                        print(cat_name.text + cat_price.text)
+                # 3.1 get list of category - END
+
+                # 3.2 click desired category - START
+                # 3.2 click desired category - END
+                    
+                # 3.3 click desired category - START
+                # 3.3 click desired category - END
+            except Exception as exc:
+                print("find .bigtix-booking-category-fulllist fail")
+
+    # Failed/Invalid cases:
+
+    # https://my.bookmyshow.com/booking/IU24MYS/invalid
+    if '/booking/' and '/invalid' in url:
+        try:
+            back_home_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-portal-error-page__button-primary')
+            back_home_btn.click()
+
+        except Exception as exc:
+            print("find .bigtix-booking-message-return fail")
+
+    # https://my.bookmyshow.com/checkout/expired
+    if '/checkout/expired' in url:
+        try:
+            back_home_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-message-return')
+            back_home_btn.click()
+
+        except Exception as exc:
+            print("find .bigtix-booking-message-return fail")
+
+    return bms_dict
+
 def get_current_url(driver):
     DISCONNECTED_MSG = ': target window already closed'
 
@@ -12453,6 +12542,14 @@ def main(args):
     ticketplus_dict["fail_list"]=[]
     ticketplus_dict["is_popup_confirm"] = False
 
+    bms_dict = {}
+    bms_dict["fail_list"]=[]
+    bms_dict["fail_promo_list"]=[]
+    bms_dict["start_time"]=None
+    bms_dict["done_time"]=None
+    bms_dict["elapsed_time"]=None
+    bms_dict["area_retry_count"]=0
+
     ocr = None
     Captcha_Browser = None
     try:
@@ -12563,6 +12660,17 @@ def main(args):
             softix_family = True
         if softix_family:
             hkticketing_dict = softix_powerweb_main(driver, url, config_dict, hkticketing_dict)
+        
+        # for my.bookmyshow.com
+        bms_family = False
+        if 'my.bookmyshow.com' in url:
+            bms_family = True
+        if 'sg.bookmyshow.com' in url:
+            bms_family = True
+        if 'id.bookmyshow.com' in url:
+            bms_family = True
+        if bms_family:
+            bms_dict = bms_main(driver, url, config_dict, bms_dict)
 
         # for facebook
         facebook_login_url = 'https://www.facebook.com/login.php?'
