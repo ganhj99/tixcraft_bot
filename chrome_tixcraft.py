@@ -7411,17 +7411,26 @@ def hkticketing_login(driver, account, password):
 
 def ticketmastersg_login(driver, account, password):
     # print(driver.find_element(By.XPATH, '//input[@name="username"]')) #signInFormUsername
-    initial_size = driver.get_window_size()
-    initial_height = initial_size.get('height')
-    initial_width = initial_size.get('width')
-
-    driver.set_window_size(200, 500) #set small to login
-    
-    is_email_sent = assign_text(driver, By.XPATH, '//input[@name="username"]', account)
+    is_login_error = False
     is_password_sent = False
-    if is_email_sent:
-        is_password_sent = assign_text(driver, By.XPATH, '//input[@name="password"]', password, submit=True)
-        driver.set_window_size(initial_width, initial_height) #set small to login
+    try:
+        login_err_msg = driver.find_element(By.CSS_SELECTOR, '#loginErrorMessage')
+        if not login_err_msg is None:
+            is_login_error = True
+    except Exception as exc:
+        pass
+
+    if not is_login_error:
+        initial_size = driver.get_window_size()
+        initial_height = initial_size.get('height')
+        initial_width = initial_size.get('width')
+
+        driver.set_window_size(200, 500) #set small to login
+        
+        is_email_sent = assign_text(driver, By.XPATH, '//input[@name="username"]', account)
+        if is_email_sent:
+            is_password_sent = assign_text(driver, By.XPATH, '//input[@name="password"]', password, submit=True)
+            driver.set_window_size(initial_width, initial_height) #set small to login
 
     return is_password_sent
 
