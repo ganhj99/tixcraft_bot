@@ -196,6 +196,7 @@ def load_translate():
     en_us["ticket_account"] = 'TICKET account'
     en_us["udn_account"] = 'UDN account'
     en_us["ticketplus_account"] = 'TicketPlus account'
+    en_us["ticketmastersg_account"] = 'TicketMaster.sg account'
 
     en_us["password"] = 'Password'
     en_us["facebook_password"] = 'Facebook password'
@@ -208,6 +209,7 @@ def load_translate():
     en_us["ticket_password"] = 'TICKET password'
     en_us["udn_password"] = 'UDN password'
     en_us["ticketplus_password"] = 'TicketPlus password'
+    en_us["ticketmastersg_password"] = 'TicketMaster.sg password'
     en_us["save_password_alert"] = 'Saving passwords to config file may expose your passwords.'
 
     en_us["play_captcha_sound"] = 'Play sound while ordering'
@@ -701,6 +703,7 @@ def get_default_config():
     config_dict["advanced"]["ticket_account"] = ""
     config_dict["advanced"]["udn_account"] = ""
     config_dict["advanced"]["ticketplus_account"] = ""
+    config_dict["advanced"]["ticketmastersg_account"] = ""
 
     config_dict["advanced"]["facebook_password"] = ""
     config_dict["advanced"]["kktix_password"] = ""
@@ -712,6 +715,7 @@ def get_default_config():
     config_dict["advanced"]["ticket_password"] = ""
     config_dict["advanced"]["udn_password"] = ""
     config_dict["advanced"]["ticketplus_password"] = ""
+    config_dict["advanced"]["ticketmastersg_password"] = ""
 
     config_dict["advanced"]["chrome_extension"] = True
     config_dict["advanced"]["disable_adjacent_seat"] = False
@@ -841,6 +845,7 @@ def btn_save_act(language_code, slience_mode=False):
     global txt_ticket_account
     global txt_udn_account
     global txt_ticketplus_account
+    global txt_ticketmastersg_account
 
     global txt_facebook_password
     global txt_kktix_password
@@ -852,6 +857,7 @@ def btn_save_act(language_code, slience_mode=False):
     global txt_ticket_password
     global txt_udn_password
     global txt_ticketplus_password
+    global txt_ticketmastersg_password
 
     global chk_state_play_captcha_sound
     global txt_captcha_sound_filename
@@ -1049,6 +1055,7 @@ def btn_save_act(language_code, slience_mode=False):
         config_dict["advanced"]["ticket_account"] = txt_ticket_account.get().strip()
         config_dict["advanced"]["udn_account"] = txt_udn_account.get().strip()
         config_dict["advanced"]["ticketplus_account"] = txt_ticketplus_account.get().strip()
+        config_dict["advanced"]["ticketmastersg_account"] = txt_ticketmastersg_account.get().strip()
 
         config_dict["advanced"]["facebook_password"] = txt_facebook_password.get().strip()
         config_dict["advanced"]["kktix_password"] = txt_kktix_password.get().strip()
@@ -1060,6 +1067,7 @@ def btn_save_act(language_code, slience_mode=False):
         config_dict["advanced"]["ticket_password"] = txt_ticket_password.get().strip()
         config_dict["advanced"]["udn_password"] = txt_udn_password.get().strip()
         config_dict["advanced"]["ticketplus_password"] = txt_ticketplus_password.get().strip()
+        config_dict["advanced"]["ticketmastersg_password"] = txt_ticketmastersg_password.get().strip()
 
         config_dict["advanced"]["tixcraft_sid"] = encryptMe(config_dict["advanced"]["tixcraft_sid"])
         config_dict["advanced"]["ibonqware"] = encryptMe(config_dict["advanced"]["ibonqware"])
@@ -1073,6 +1081,7 @@ def btn_save_act(language_code, slience_mode=False):
         config_dict["advanced"]["ticket_password"] = encryptMe(config_dict["advanced"]["ticket_password"])
         config_dict["advanced"]["udn_password"] = encryptMe(config_dict["advanced"]["udn_password"])
         config_dict["advanced"]["ticketplus_password"] = encryptMe(config_dict["advanced"]["ticketplus_password"])
+        config_dict["advanced"]["ticketmastersg_password"] = encryptMe(config_dict["advanced"]["ticketmastersg_password"])
 
         config_dict["advanced"]["chrome_extension"] = bool(chk_state_chrome_extension.get())
         config_dict["advanced"]["disable_adjacent_seat"] = bool(chk_state_adjacent_seat.get())
@@ -1507,6 +1516,7 @@ def applyNewLanguage():
     global lbl_ticket_account
     global lbl_udn_account
     global lbl_ticketplus_account
+    global lbl_ticketmastersg_account
 
     global lbl_password
     global lbl_facebook_password
@@ -1519,6 +1529,7 @@ def applyNewLanguage():
     global lbl_ticket_password
     global lbl_udn_password
     global lbl_ticketplus_password
+    global lbl_ticketmastersg_password
 
     global lbl_save_password_alert
 
@@ -1537,6 +1548,7 @@ def applyNewLanguage():
     lbl_ticket_account.config(text=translate[language_code]["ticket_account"])
     lbl_udn_account.config(text=translate[language_code]["udn_account"])
     lbl_ticketplus_account.config(text=translate[language_code]["ticketplus_account"])
+    lbl_ticketmastersg_account.config(text=translate[language_code]["ticketmastersg_account"])
 
     lbl_password.config(text=translate[language_code]["password"])
     #lbl_facebook_password.config(text=translate[language_code]["facebook_password"])
@@ -1547,6 +1559,7 @@ def applyNewLanguage():
     #lbl_kham_password.config(text=translate[language_code]["kham_password"])
     #lbl_ticket_password.config(text=translate[language_code]["ticket_password"])
     #lbl_ticketplus_password.config(text=translate[language_code]["ticketplus_password"])
+    #lbl_ticketmastersg_password.config(text=translate[language_code]["ticketmastersg_password"])
 
     lbl_save_password_alert.config(text=translate[language_code]["save_password_alert"])
 
@@ -2569,6 +2582,22 @@ def AutofillTab(root, config_dict, language_code, UI_PADDING_X):
     txt_ticketplus_password_value = StringVar(frame_group_header, value=decryptMe(config_dict["advanced"]["ticketplus_password"].strip()))
     txt_ticketplus_password = Entry(frame_group_header, width=15, textvariable = txt_ticketplus_password_value, show="*")
     txt_ticketplus_password.grid(column=2, row=group_row_count, sticky = W)
+
+    group_row_count +=1
+
+    global lbl_ticketmastersg_account
+    lbl_ticketmastersg_account = Label(frame_group_header, text=translate[language_code]['ticketmastersg_account'])
+    lbl_ticketmastersg_account.grid(column=0, row=group_row_count, sticky = E)
+
+    global txt_ticketmastersg_account
+    txt_ticketmastersg_account_value = StringVar(frame_group_header, value=config_dict["advanced"]["ticketmastersg_account"].strip())
+    txt_ticketmastersg_account = Entry(frame_group_header, width=15, textvariable = txt_ticketmastersg_account_value)
+    txt_ticketmastersg_account.grid(column=1, row=group_row_count, sticky = W)
+
+    global txt_ticketmastersg_password
+    txt_ticketmastersg_password_value = StringVar(frame_group_header, value=decryptMe(config_dict["advanced"]["ticketmastersg_password"].strip()))
+    txt_ticketmastersg_password = Entry(frame_group_header, width=15, textvariable = txt_ticketmastersg_password_value, show="*")
+    txt_ticketmastersg_password.grid(column=2, row=group_row_count, sticky = W)
 
     group_row_count +=1
 

@@ -212,6 +212,12 @@ def get_config_dict(args):
             if not args.kktix_password is None:
                 if len(args.kktix_password) > 0:
                     config_dict["advanced"]["kktix_password"] = args.kktix_password
+            if not args.ticketmastersg_account is None:
+                if len(args.ticketmastersg_account) > 0:
+                    config_dict["advanced"]["ticketmastersg_account"] = args.ticketmastersg_account
+            if not args.ticketmastersg_password is None:
+                if len(args.ticketmastersg_password) > 0:
+                    config_dict["advanced"]["ticketmastersg_password"] = args.ticketmastersg_password
             if not args.ibonqware is None:
                 if len(args.ibonqware) > 0:
                     config_dict["advanced"]["ibonqware"] = encryptMe(args.ibonqware)
@@ -7831,13 +7837,9 @@ def tixcraft_main(driver, url, config_dict, tixcraft_dict, ocr, Captcha_Browser)
     else:
         tixcraft_dict["is_popup_checkout"] = False
     
-        kktix_account = config_dict["advanced"]["kktix_account"]
-
-    # is_url_contain_sign_in = False
-    # fix https://kktix.com/users/sign_in?back_to=https://kktix.com/events/xxxx and registerStatus: SOLD_OUT cause page refresh.
     if 'main.login.ticketmaster.sg/login?' in url:
-        # if len(kktix_account) > 4:
-        ticketmastersg_login(driver, kktix_account, decryptMe(config_dict["advanced"]["kktix_password"]))
+        ticketmastersg_account = config_dict["advanced"]["ticketmastersg_account"]
+        ticketmastersg_login(driver, ticketmastersg_account, decryptMe(config_dict["advanced"]["ticketmastersg_password"]))
         # is_url_contain_sign_in = True
 
     # if not is_url_contain_sign_in:
@@ -12624,6 +12626,14 @@ def cli():
 
     parser.add_argument("--kktix_password",
         help="overwrite kktix_password field",
+        type=str)
+
+    parser.add_argument("--ticketmastersg_account",
+        help="overwrite ticketmastersg_account field",
+        type=str)
+
+    parser.add_argument("--ticketmastersg_password",
+        help="overwrite ticketmastersg_password field",
         type=str)
 
     parser.add_argument("--ibonqware",
