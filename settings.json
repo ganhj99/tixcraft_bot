@@ -1,7 +1,7 @@
 {
     "homepage": "https://tixcraft.com",
     "browser": "chrome",
-    "language": "English",
+    "language": "\u7e41\u9ad4\u4e2d\u6587",
     "ticket_number": 2,
     "ocr_captcha": {
         "enable": true,
