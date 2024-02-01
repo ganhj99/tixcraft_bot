@@ -12668,21 +12668,21 @@ def bms_area_auto_select(driver, url, config_dict):
         is_need_refresh = False
         matched_blocks = None
 
-        # if len(area_keyword) > 0:
-        #     area_keyword_array = []
-        #     try:
-        #         area_keyword_array = json.loads("["+ area_keyword +"]")
-        #     except Exception as exc:
-        #         area_keyword_array = []
-        #     for area_keyword_item in area_keyword_array:
-        #         is_need_refresh, matched_blocks = get_bms_target_area(el, config_dict, area_keyword_item)
-        #         if not is_need_refresh:
-        #             break
-        #         else:
-        #             print("is_need_refresh for keyword:", area_keyword_item)
-        # else:
+        if len(area_keyword) > 0:
+            area_keyword_array = []
+            try:
+                area_keyword_array = json.loads("["+ area_keyword +"]")
+            except Exception as exc:
+                area_keyword_array = []
+            for area_keyword_item in area_keyword_array:
+                is_need_refresh, matched_blocks = get_bms_target_area(driver, cat_list_div, config_dict, area_keyword_item)
+                if not is_need_refresh:
+                    break
+                else:
+                    print("is_need_refresh for keyword:", area_keyword_item)
+        else:
             # empty keyword, match all.
-        is_need_refresh, matched_blocks = get_bms_target_area(driver, cat_list_div, config_dict, "")
+            is_need_refresh, matched_blocks = get_bms_target_area(driver, cat_list_div, config_dict, "")
 
         target_area = get_target_item_from_matched_list(matched_blocks, auto_select_mode)
         if not target_area is None:
@@ -12858,7 +12858,16 @@ def bms_main(driver, url, config_dict, bms_dict):
                 book_now_btn.click()
         except Exception as exc:
             print_v(config_dict, "find #bmsportal-book fail, retrying..")
-            pass
+            #### Temporarily solution for auto reload waiting page -START
+            time.sleep(0.5)
+            try:
+                driver.refresh()
+            except Exception as exc:
+                pass
+
+            if config_dict["advanced"]["auto_reload_page_interval"] > 0:
+                time.sleep(config_dict["advanced"]["auto_reload_page_interval"])
+            #### Temporarily solution for auto reload waiting page -END
     
     # https://mmic.bigtix.io/booking/SAMLEE24/sessions
     # if '/booking/' and '/sessions' in url:
