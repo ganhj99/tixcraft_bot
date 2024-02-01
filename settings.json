@@ -1,7 +1,7 @@
 {
-    "homepage": "https://tixcraft.com",
+    "homepage": "https://my.bookmyshow.com/events/ive-the-1st-world-tour-%3Cshow-what-i-have%3E-in-kuala-lumpur/IVE24MYS",
     "browser": "chrome",
-    "language": "\u7e41\u9ad4\u4e2d\u6587",
+    "language": "English",
     "ticket_number": 2,
     "ocr_captcha": {
         "enable": true,
@@ -17,10 +17,10 @@
     },
     "area_auto_select": {
         "enable": true,
-        "mode": "random",
+        "mode": "from top to bottom",
         "area_keyword": ""
     },
-    "keyword_exclude": "\"\u8f2a\u6905\",\"\u8eab\u969c\",\"\u8eab\u5fc3 \u969c\u7919\",\"Restricted View\",\"\u71c8\u67f1\u906e\u853d\",\"\u8996\u7dda\u4e0d\u5b8c\u6574\"",
+    "keyword_exclude": "\"\u8f2a\u6905\",\"\u8eab\u969c\",\"\u8eab\u5fc3 \u969c\u7919\",\"Restricted View\",\"\u71c8\u67f1\u906e\u853d\",\"\u8996\u7dda\u4e0d\u5b8c\u6574\",\"PS1\"",
     "kktix": {
         "auto_press_next_step_button": true,
         "auto_fill_ticket_number": true
@@ -28,6 +28,19 @@
     "tixcraft": {
         "pass_date_is_sold_out": true,
         "auto_reload_coming_soon_page": true
+    },
+    "bms": {
+        "pass_date_is_sold_out": true,
+        "auto_reload_coming_soon_page": true,
+        "auto_press_next_step_button": true,
+        "auto_fill_ticket_number": true,
+        "auto_fill_patron": {
+            "enable": true,
+            "name": "tan ali",
+            "email": "tanali@gmail.com",
+            "ph_country": "malaysia",
+            "ph_no": "0126625263"
+        }
     },
     "advanced": {
         "play_captcha_sound": {
@@ -65,7 +78,7 @@
         "auto_guess_options": true,
         "user_guess_string": "",
         "remote_url": "\"http://127.0.0.1:16888/\"",
-        "auto_reload_page_interval": 0.1,
+        "auto_reload_page_interval": 0.5,
         "reset_browser_interval": 0.0,
         "proxy_server_port": "",
         "idle_keyword": "",

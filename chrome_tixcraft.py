@@ -34,6 +34,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from urllib3.exceptions import InsecureRequestWarning
+from urllib3 import util
 
 from NonBrowser import NonBrowser
 
@@ -477,7 +478,7 @@ def get_chrome_options(webdriver_path, config_dict):
     chrome_options.add_argument('--disable-features=TranslateUI')
     chrome_options.add_argument('--disable-translate')
     chrome_options.add_argument('--disable-web-security')
-    chrome_options.add_argument('--lang=zh-TW')
+    chrome_options.add_argument('--lang=en-US')
 
     # for navigator.webdriver
     chrome_options.add_experimental_option("excludeSwitches", ['enable-automation'])
@@ -1007,6 +1008,7 @@ def get_driver_by_config(config_dict):
                 NETWORK_BLOCKED_URLS.append('*ticketimg2.azureedge.net/image/ActivityImage/ActivityImage_*')
                 NETWORK_BLOCKED_URLS.append('*.azureedge.net/QWARE_TICKET//images/*')
                 NETWORK_BLOCKED_URLS.append('*static.ticketplus.com.tw/event/*')
+                NETWORK_BLOCKED_URLS.append('*cdn-sea.bookmyshow.com*.jpg*')
 
             if config_dict["advanced"]["block_facebook_network"]:
                 NETWORK_BLOCKED_URLS.append('*facebook.com/*')
@@ -12294,31 +12296,621 @@ def ticketplus_main(driver, url, config_dict, ocr, Captcha_Browser, ticketplus_d
 
     return ticketplus_dict
 
+# PURPOSE: print only when verbose
+# RETURN:
+#   is_loaded
+def print_v(config_dict, value):
+    show_debug_message = False
+    if config_dict["advanced"]["verbose"]:
+        show_debug_message = True
+        
+    if show_debug_message is True:
+        print(value)
+
+def bms_get_ticketPriceList(driver, config_dict):
+    show_debug_message = True       # debug.
+    show_debug_message = False      # online
+
+    if config_dict["advanced"]["verbose"]:
+        show_debug_message = True
+
+    div_mapContainer = None
+    try:
+        my_css_selector = '#mapContainer'
+        div_mapContainer = driver.find_element(By.CSS_SELECTOR, my_css_selector)
+    except Exception as exc:
+        if show_debug_message:
+            print('fail to find my_css_selector:', my_css_selector)
+            #print("find table#ticketPriceList fail", exc)
+
+    table_select = None
+    if not div_mapContainer is None:
+        is_loading = False
+
+        # check is loading.
+        div_loadingmap = None
+        try:
+            my_css_selector = '#loadingmap'
+            div_loadingmap = driver.find_element(By.CSS_SELECTOR, my_css_selector)
+            if  not div_loadingmap is None:
+                is_loading = True
+        except Exception as exc:
+            if show_debug_message:
+                print('fail to find my_css_selector:', my_css_selector)
+                #print("find table#ticketPriceList fail", exc)
+
+        if not is_loading:
+            try:
+                my_css_selector = '#ticketPriceList'
+                table_select = driver.find_element(By.CSS_SELECTOR, my_css_selector)
+            except Exception as exc:
+                if show_debug_message:
+                    print('fail to find my_css_selector:', my_css_selector)
+                    #print("find table#ticketPriceList fail", exc)
+
+            if table_select is None:
+                ticketmaster_parse_zone_info(driver, config_dict)
+
+    return table_select
+
+
+# PURPOSE: get target area list.
+# RETURN:
+#   is_need_refresh
+#   matched_blocks
+# PS: matched_blocks will be None, if length equals zero.
+def get_bms_target_area(driver, cat_list_div, config_dict, area_keyword_item):
+    show_debug_message = True       # debug.
+    show_debug_message = False      # online
+
+    if config_dict["advanced"]["verbose"]:
+        show_debug_message = True
+
+    # read config.
+    area_auto_select_mode = config_dict["area_auto_select"]["mode"]
+
+    is_need_refresh = False
+    matched_blocks = None
+
+    area_list = None
+    area_list_count = 0
+    if not cat_list_div is None:
+        overview_map_loaded = False
+        try:
+            overview_map = driver.find_elements(By.CSS_SELECTOR, '.bigtix-overview-map > .bigtix-svg-map')
+        except Exception as exc:
+            print("werwer..")
+            pass
+        
+        if not overview_map is None:
+            overview_map_loaded = True
+        
+        if overview_map_loaded is False:
+            print("overview_map not loaded, retrying..")
+            return
+        
+        try:
+            area_list = driver.find_elements(By.CSS_SELECTOR, 'g#layer-overview > polygon:not(.bigtix-overview-map__area-hidden)')
+            #     if not "bigtix-card--disabled" in cat_div.get_attribute('class') :
+            #         cat_name = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__body> .bigtix-card__main > .bigtix-card__title')
+            #         cat_price = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__footer> .bigtix-price-display > b')
+        except Exception as exc:
+            print("find area list li tag fail")
+            pass
+
+        if not area_list is None:
+            area_list_count = len(area_list)
+            if area_list_count == 0:
+                print("area list is empty, do refresh!")
+                is_need_refresh = True
+        else:
+            print("area list is None, do refresh!")
+            is_need_refresh = True
+
+    if area_list_count > 0:
+        matched_blocks = []
+        for row in area_list:
+            row_text = ""
+            row_html = ""
+            try:
+                #row_text = row.text
+                row_html = row.get_attribute('innerHTML')
+                # row_text = remove_html_tags(row_html)
+                row_text = row.get_dom_attribute("data-section-name")
+            except Exception as exc:
+                if show_debug_message:
+                    print(exc)
+                # error, exit loop
+                break
+
+            if len(row_text) > 0:
+                if reset_row_text_if_match_keyword_exclude(config_dict, row_text):
+                    row_text = ""
+
+            if len(row_text) > 0:
+                # clean stop word.
+                row_text = format_keyword_string(row_text)
+
+                is_append_this_row = False
+
+                if len(area_keyword_item) > 0:
+                    # must match keyword.
+                    is_append_this_row = True
+                    area_keyword_array = area_keyword_item.split(' ')
+                    for area_keyword in area_keyword_array:
+                        area_keyword = format_keyword_string(area_keyword)
+                        if not area_keyword in row_text:
+                            is_append_this_row = False
+                            break
+                else:
+                    # without keyword.
+                    is_append_this_row = True
+
+                if is_append_this_row:
+                    if config_dict["ticket_number"] > 1:
+                        area_item_font_el = None
+                        try:
+                            #print('try to find font tag at row:', row_text)
+                            area_item_font_el = row.find_element(By.TAG_NAME, 'font')
+                            if not area_item_font_el is None:
+                                font_el_text = area_item_font_el.text
+                                if font_el_text is None:
+                                    font_el_text = ""
+                                font_el_text = "@%s@" % (font_el_text)
+                                if show_debug_message:
+                                    print('font tag text:', font_el_text)
+                                    pass
+                                for check_item in CONT_STRING_1_SEATS_REMAINING:
+                                    if check_item in font_el_text:
+                                        if show_debug_message:
+                                            print("match pass 1 seats remaining 1 full text:", row_text)
+                                            print("match pass 1 seats remaining 2 font text:", font_el_text)
+                                        is_append_this_row = False
+                            else:
+                                #print("row withou font tag.")
+                                pass
+                        except Exception as exc:
+                            #print("find font text in a tag fail:", exc)
+                            pass
+
+                if show_debug_message:
+                    print("is_append_this_row:", is_append_this_row)
+
+                if is_append_this_row:
+                    matched_blocks.append(row)
+
+                    if area_auto_select_mode == CONST_FROM_TOP_TO_BOTTOM:
+                        #print("only need first item, break area list loop.")
+                        break
+
+        if len(matched_blocks) == 0:
+            matched_blocks = None
+            is_need_refresh = True
+
+    return is_need_refresh, matched_blocks
+
+# # PURPOSE: get target area list.
+# # RETURN:
+# #   is_need_refresh
+# #   matched_blocks
+# # PS: matched_blocks will be None, if length equals zero.
+# def get_bms_target_area2(cat_list_div, config_dict, area_keyword_item):
+#     show_debug_message = True       # debug.
+#     show_debug_message = False      # online
+
+#     if config_dict["advanced"]["verbose"]:
+#         show_debug_message = True
+
+#     # read config.
+#     area_auto_select_mode = config_dict["area_auto_select"]["mode"]
+
+#     is_need_refresh = False
+#     matched_blocks = None
+
+#     area_list = None
+#     area_list_count = 0
+#     if not cat_list_div is None:
+#         try:
+#             area_list = cat_list_div.find_elements(By.CSS_SELECTOR, 'li > div:not(.bigtix-card--disabled) .bigtix-card__content > .bigtix-card__body> .bigtix-card__main > .bigtix-card__title')
+#             #     if not "bigtix-card--disabled" in cat_div.get_attribute('class') :
+#             #         cat_name = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__body> .bigtix-card__main > .bigtix-card__title')
+#             #         cat_price = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__footer> .bigtix-price-display > b')
+#         except Exception as exc:
+#             print("find area list li tag fail")
+#             pass
+
+#         if not area_list is None:
+#             area_list_count = len(area_list)
+#             if area_list_count == 0:
+#                 print("area list is empty, do refresh!")
+#                 is_need_refresh = True
+#         else:
+#             print("area list is None, do refresh!")
+#             is_need_refresh = True
+
+#     if area_list_count > 0:
+#         matched_blocks = []
+#         for row in area_list:
+#             row_text = ""
+#             row_html = ""
+#             try:
+#                 #row_text = row.text
+#                 row_html = row.get_attribute('innerHTML')
+#                 row_text = remove_html_tags(row_html)
+#             except Exception as exc:
+#                 if show_debug_message:
+#                     print(exc)
+#                 # error, exit loop
+#                 break
+
+#             if len(row_text) > 0:
+#                 if reset_row_text_if_match_keyword_exclude(config_dict, row_text):
+#                     row_text = ""
+
+#             if len(row_text) > 0:
+#                 # clean stop word.
+#                 row_text = format_keyword_string(row_text)
+
+#                 is_append_this_row = False
+
+#                 if len(area_keyword_item) > 0:
+#                     # must match keyword.
+#                     is_append_this_row = True
+#                     area_keyword_array = area_keyword_item.split(' ')
+#                     for area_keyword in area_keyword_array:
+#                         area_keyword = format_keyword_string(area_keyword)
+#                         if not area_keyword in row_text:
+#                             is_append_this_row = False
+#                             break
+#                 else:
+#                     # without keyword.
+#                     is_append_this_row = True
+
+#                 if is_append_this_row:
+#                     if config_dict["ticket_number"] > 1:
+#                         area_item_font_el = None
+#                         try:
+#                             #print('try to find font tag at row:', row_text)
+#                             area_item_font_el = row.find_element(By.TAG_NAME, 'font')
+#                             if not area_item_font_el is None:
+#                                 font_el_text = area_item_font_el.text
+#                                 if font_el_text is None:
+#                                     font_el_text = ""
+#                                 font_el_text = "@%s@" % (font_el_text)
+#                                 if show_debug_message:
+#                                     print('font tag text:', font_el_text)
+#                                     pass
+#                                 for check_item in CONT_STRING_1_SEATS_REMAINING:
+#                                     if check_item in font_el_text:
+#                                         if show_debug_message:
+#                                             print("match pass 1 seats remaining 1 full text:", row_text)
+#                                             print("match pass 1 seats remaining 2 font text:", font_el_text)
+#                                         is_append_this_row = False
+#                             else:
+#                                 #print("row withou font tag.")
+#                                 pass
+#                         except Exception as exc:
+#                             #print("find font text in a tag fail:", exc)
+#                             pass
+
+#                 if show_debug_message:
+#                     print("is_append_this_row:", is_append_this_row)
+
+#                 if is_append_this_row:
+#                     matched_blocks.append(row)
+
+#                     if area_auto_select_mode == CONST_FROM_TOP_TO_BOTTOM:
+#                         #print("only need first item, break area list loop.")
+#                         break
+
+#         if len(matched_blocks) == 0:
+#             matched_blocks = None
+#             is_need_refresh = True
+
+#     return is_need_refresh, matched_blocks
+
+# PURPOSE: check is BMS still loading
+# RETURN:
+#   is_loaded
+def bms_is_page_loaded(driver, config_dict):
+    is_loaded = False
+    try:
+        # wait = WebDriverWait(driver, 1)
+        nextjs = driver.find_element(By.CSS_SELECTOR, '#__next')
+        # loading = driver.find_element(By.CSS_SELECTOR, '.sc-AxiKw.czDWFq')
+        loading = driver.find_element(By.CSS_SELECTOR, '.sc-AxiKw.ePgSaa')
+        if not nextjs is None:
+            if not nextjs.get_attribute("innerHTML") is None:
+                is_loaded = True
+        if loading is None: # or loading2 is None:
+            # print("bms finished loading")
+            is_loaded = True
+        else:
+            print_v(config_dict, "bms loading...")
+    except Exception as exc:
+        # print("cannot find bms page load")
+        is_loaded = True
+
+    return is_loaded
+
+def bms_area_auto_select(driver, url, config_dict):
+    show_debug_message = True       # debug.
+    show_debug_message = False      # online
+
+    if config_dict["advanced"]["verbose"]:
+        show_debug_message = True
+
+    # read config.
+    area_keyword = config_dict["area_auto_select"]["area_keyword"].strip()
+    auto_select_mode = config_dict["area_auto_select"]["mode"]
+
+    ticket_number = config_dict["ticket_number"]
+    
+    if show_debug_message:
+        print("area_keyword:", area_keyword)
+
+    cat_list_div = None
+    try:
+        # 3.1 get list of category - START
+        cat_list_div = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-category-fulllist')
+        # cat_list = driver.find_elements(By.CSS_SELECTOR, '.bigtix-booking-category-fulllist > li')
+        # for cat in cat_list:
+        #     cat_div = cat.find_element(By.CSS_SELECTOR, 'div')
+        #     if not "bigtix-card--disabled" in cat_div.get_attribute('class') :
+        #         cat_name = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__body> .bigtix-card__main > .bigtix-card__title')
+        #         cat_price = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__footer> .bigtix-price-display > b')
+        #         print(cat_name.text + cat_price.text)
+        # 3.1 get list of category - END
+    except Exception as exc:
+        print("find .bigtix-booking-category-fulllist fail, do nothing.")
+
+    if not cat_list_div is None:
+        is_need_refresh = False
+        matched_blocks = None
+
+        # if len(area_keyword) > 0:
+        #     area_keyword_array = []
+        #     try:
+        #         area_keyword_array = json.loads("["+ area_keyword +"]")
+        #     except Exception as exc:
+        #         area_keyword_array = []
+        #     for area_keyword_item in area_keyword_array:
+        #         is_need_refresh, matched_blocks = get_bms_target_area(el, config_dict, area_keyword_item)
+        #         if not is_need_refresh:
+        #             break
+        #         else:
+        #             print("is_need_refresh for keyword:", area_keyword_item)
+        # else:
+            # empty keyword, match all.
+        is_need_refresh, matched_blocks = get_bms_target_area(driver, cat_list_div, config_dict, "")
+
+        target_area = get_target_item_from_matched_list(matched_blocks, auto_select_mode)
+        if not target_area is None:
+            try:
+                target_area.click()
+            except Exception as exc:
+                print("click area a link fail, start to retry...")
+                try:
+                    driver.execute_script("arguments[0].click();", target_area)
+                except Exception as exc:
+                    print("click area a link fail, after reftry still fail.")
+                    print(exc)
+                    pass
+
+        # auto refresh for area list page.
+        if is_need_refresh:
+            try:
+                driver.refresh()
+            except Exception as exc:
+                pass
+
+            if config_dict["advanced"]["auto_reload_page_interval"] > 0:
+                time.sleep(config_dict["advanced"]["auto_reload_page_interval"])
+
+
+def bms_date_auto_select(driver, url, config_dict, domain_name):
+    show_debug_message = True    # debug.
+    show_debug_message = False   # online
+
+    if config_dict["advanced"]["verbose"]:
+        show_debug_message = True
+
+    # read config.
+    auto_select_mode = config_dict["date_auto_select"]["mode"]
+    date_keyword = config_dict["date_auto_select"]["date_keyword"].strip()
+    # TODO: implement this feature.
+    date_keyword_and = ""
+    pass_date_is_sold_out_enable = config_dict["tixcraft"]["pass_date_is_sold_out"]
+    auto_reload_coming_soon_page_enable = config_dict["tixcraft"]["auto_reload_coming_soon_page"]
+
+    # PS: for big events, check sold out text maybe not helpful, due to database is too busy.
+    sold_out_text_list = ["選購一空","已售完","No tickets available","Sold out","空席なし","完売した"]
+    find_ticket_text_list = ['See Tickets']
+
+    area_list = None
+    try:
+        area_list = driver.find_elements(By.CSS_SELECTOR, '.bigtix-sessions-list-v2__content > .bigtix-sessions-list-v2__days > div')
+    except Exception as exc:
+        print("find #gameList fail")
+
+    matched_blocks = None
+    formated_area_list = None
+
+    if not area_list is None:
+        area_list_count = len(area_list)
+        if show_debug_message:
+            print("date_list_count:", area_list_count)
+
+        if area_list_count > 0:
+            formated_area_list = []
+            for row in area_list:
+                row_text = ""
+                row_html = ""
+                try:
+                    #row_text = row.text
+                    row_html = row.get_attribute('innerHTML')
+                    row_text = remove_html_tags(row_html)
+                except Exception as exc:
+                    if show_debug_message:
+                        print(exc)
+                    # error, exit loop
+                    break
+
+                if len(row_text) > 0:
+                    row_is_enabled=False
+                    # must contains 'See Tickets'
+                    for text_item in find_ticket_text_list:
+                        if text_item in row_text:
+                            row_is_enabled = True
+                            break
+
+                    # check sold out text.
+                    if row_is_enabled:
+                        if pass_date_is_sold_out_enable:
+                            for sold_out_item in sold_out_text_list:
+                                if sold_out_item in row_text:
+                                    row_is_enabled = False
+                                    if show_debug_message:
+                                        print("match sold out text: %s, skip this row." % (sold_out_item))
+                                    break
+
+                    if row_is_enabled:
+                        formated_area_list.append(row)
+
+            if show_debug_message:
+                print("formated_area_list count:", len(formated_area_list))
+
+            if len(date_keyword) == 0:
+                matched_blocks = formated_area_list
+            else:
+                # match keyword.
+                date_keyword = format_keyword_string(date_keyword)
+                if show_debug_message:
+                    print("start to match formated keyword:", date_keyword)
+
+                matched_blocks = get_matched_blocks_by_keyword(config_dict, auto_select_mode, date_keyword, formated_area_list)
+
+                if show_debug_message:
+                    if not matched_blocks is None:
+                        print("after match keyword, found count:", len(matched_blocks))
+        else:
+            print("not found date-time-position")
+            pass
+    else:
+        print("date date-time-position is None")
+        pass
+
+    target_area = get_target_item_from_matched_list(matched_blocks, auto_select_mode)
+
+    is_date_clicked = False
+    if not target_area is None:
+        is_date_clicked = force_press_button(target_area, By.CSS_SELECTOR,'a')
+        if is_date_clicked:
+            try:
+                window_handles_count = len(driver.window_handles)
+                if window_handles_count > 1:
+                    driver.switch_to.window(driver.window_handles[0])
+                    driver.close()
+                    driver.switch_to.window(driver.window_handles[0])
+                    time.sleep(0.2)
+            except Exception as excSwithFail:
+                pass
+
+
+    # [PS]: current reload condition only when
+    if auto_reload_coming_soon_page_enable:
+        if not is_date_clicked:
+            if not formated_area_list is None:
+                if len(formated_area_list) == 0:
+                    print('start to refresh page.')
+                    try:
+                        driver.refresh()
+                        time.sleep(0.3)
+                    except Exception as exc:
+                        pass
+
+    return is_date_clicked
+
 def bms_main(driver, url, config_dict, bms_dict):
-    bms_account = config_dict["advanced"]["kktix_account"]
+    # config
+    _date_auto_select_enable = config_dict["date_auto_select"]["enable"]
+    _auto_press_next_step_button = config_dict["bms"]["auto_press_next_step_button"]
+    _auto_fill_ticket_number = config_dict["bms"]["auto_fill_ticket_number"]
+    _auto_fill_patron_enable = config_dict["bms"]["auto_fill_patron"]["enable"]
+    _auto_fill_patron_name = config_dict["bms"]["auto_fill_patron"]["name"]
+    _auto_fill_patron_email = config_dict["bms"]["auto_fill_patron"]["email"]
+    _auto_fill_patron_ph_country = config_dict["bms"]["auto_fill_patron"]["ph_country"]
+    _auto_fill_patron_ph_no = config_dict["bms"]["auto_fill_patron"]["ph_no"]
+
+    if bms_is_page_loaded(driver, config_dict) is False:
+        return
+    
+    parsed_url = util.parse_url(url)
+    parsed_split_paths = parsed_url.path.split('/') #['', 'booking', 'IVE24MYS']
+    if len(parsed_split_paths) > 0:
+        parsed_split_paths.pop(0) #['booking', 'IVE24MYS']
+    
+    # https://my.bookmyshow.com/events/ive-the-1st-world-tour-%3Cshow-what-i-have%3E-in-kuala-lumpur/IVE24MYS
+    if parsed_split_paths[0] == 'events':
+        try:
+            if _auto_press_next_step_button is True:
+                book_now_btn = driver.find_element(By.CSS_SELECTOR, '#bmsportal-book')
+                book_now_btn.click()
+        except Exception as exc:
+            print_v(config_dict, "find #bmsportal-book fail, retrying..")
+            pass
+    
+    # https://mmic.bigtix.io/booking/SAMLEE24/sessions
+    # if '/booking/' and '/sessions' in url:
+    if len(parsed_split_paths) == 3 and parsed_split_paths[0] == 'booking' and parsed_split_paths[2] == 'sessions':
+        if _date_auto_select_enable is True:            
+            domain_name = url.split('/')[2]
+            is_date_selected = bms_date_auto_select(driver, url, config_dict, domain_name)
+            # try:
+            #     # 2.1 input quantity - START
+            #     qty_stepper_input_query = '.bigtix-sessions-list-v2__sessions'
+            #     assign_text(driver, By.CSS_SELECTOR, qty_stepper_input_query, str(config_dict["ticket_number"]), overwrite_when="1") # default value is min=1
+            #     # 2.1 input quantity - END
+
+            #     # 2.2 input promo code (optional) - START
+            #     # qty_stepper_input_query = '.bigtix-quantity-stepper__quantity > input'
+            #     # assign_text(driver, By.CSS_SELECTOR, qty_stepper_input_query, str(config_dict["ticket_number"])) 
+            #     # 2.2 input promo code (optional) - END
+
+            #     # 2.3 confirm quantity - START
+            #     confirm_qty_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-pagenav-next-container > button')
+            #     confirm_qty_btn.click()
+            #     # 2.3 input quantity - END
+
+            # except Exception as exc:
+            #     print("find .bigtix-quantity-stepper__quantity fail")
 
     # https://my.bookmyshow.com/booking/IVE24MYS
-    if ('/booking/' in url) and (not '/quantity' in url) and (not '/seats' in url):
-            try:
-                tnc_dialog_body = driver.find_element(By.CSS_SELECTOR, '.rc-dialog-body')
-                if not tnc_dialog_body is None:
-                    tnc_dialog_body_desc = tnc_dialog_body.find_element(By.CSS_SELECTOR, ':first-child')
-                    tnc_dialog_body_btn = tnc_dialog_body.find_element(By.CSS_SELECTOR, ':last-child > button')
-                    # 1.1 scroll dialog to bottom if btn disabled - START
-                    if tnc_dialog_body_btn.is_enabled() is False:
-                        max_to_scroll = tnc_dialog_body_desc.get_property("scrollHeight")
-                        scroll_origin = ScrollOrigin.from_element(tnc_dialog_body_desc)
-                        ActionChains(driver).scroll_from_origin(scroll_origin, 0, max_to_scroll).perform()
-                    # 1.1 scroll dialog to bottom if btn disabled  - END
-                    # 1.2 click "ACCEPT" button - START
-                    else:
-                        tnc_dialog_body_btn.click()
-                    # 1.2 click "ACCEPT" button - END
-            except Exception as exc:
-                print("find .rc-dialog-body fail")
+    # if ('/booking/' in url) and (not '/quantity' in url) and (not '/seats' in url) and (not '/sessions' in url):
+    if len(parsed_split_paths) == 2 and parsed_split_paths[0] == 'booking':
+        try:
+            tnc_dialog_body = driver.find_element(By.CSS_SELECTOR, '.rc-dialog-body')
+            if not tnc_dialog_body is None:
+                tnc_dialog_body_desc = tnc_dialog_body.find_element(By.CSS_SELECTOR, ':first-child')
+                tnc_dialog_body_btn = tnc_dialog_body.find_element(By.CSS_SELECTOR, ':last-child > button')
+                # 1.1 scroll dialog to bottom if btn disabled - START
+                # if tnc_dialog_body_btn.is_enabled() is False:
+                if "bigtix-button--disabled" in tnc_dialog_body_btn.get_attribute('class'):
+                    max_to_scroll = tnc_dialog_body_desc.get_property("scrollHeight")
+                    scroll_origin = ScrollOrigin.from_element(tnc_dialog_body_desc)
+                    ActionChains(driver).scroll_from_origin(scroll_origin, 0, max_to_scroll).perform()
+                # 1.1 scroll dialog to bottom if btn disabled  - END
+                # 1.2 click "ACCEPT" button - START
+                else:
+                    tnc_dialog_body_btn.click()
+                # 1.2 click "ACCEPT" button - END
+        except Exception as exc:
+            print_v(config_dict, "find .rc-dialog-body fail, retrying..")
     
     # https://my.bookmyshow.com/booking/IVE24MYS/quantity
-    if '/booking/' and '/quantity' in url:
+    # if '/booking/' and '/quantity' in url:
+    if len(parsed_split_paths) == 3 and parsed_split_paths[0] == 'booking' and parsed_split_paths[2] == 'quantity':
+        if _auto_fill_ticket_number is True:
             try:
                 # 2.1 input quantity - START
                 qty_stepper_input_query = '.bigtix-quantity-stepper__quantity > input'
@@ -12332,38 +12924,144 @@ def bms_main(driver, url, config_dict, bms_dict):
                 # 2.2 input promo code (optional) - END
 
                 # 2.3 confirm quantity - START
-                confirm_qty_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-pagenav-next-container > button')
-                confirm_qty_btn.click()
+                if _auto_press_next_step_button is True:
+                    confirm_qty_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-pagenav-next-container > button')
+                    if confirm_qty_btn.is_enabled():
+                        confirm_qty_btn.click()
                 # 2.3 input quantity - END
 
             except Exception as exc:
                 print("find .bigtix-quantity-stepper__quantity fail")
     
     # https://my.bookmyshow.com/booking/IVE24MYS/seats
-    if '/booking/' and '/seats' in url:
+    # if '/booking/' and '/seats' in url:
+    if len(parsed_split_paths) == 3 and parsed_split_paths[0] == 'booking' and parsed_split_paths[2] == 'seats':
             try:
-                # 3.1 get list of category - START
-                cat_list = driver.find_elements(By.CSS_SELECTOR, '.bigtix-booking-category-fulllist > li')
-                for cat in cat_list:
-                    cat_div = cat.find_element(By.CSS_SELECTOR, 'div')
-                    if cat_div.is_enabled() is True:
-                        cat_name = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__body> .bigtix-card__main > .bigtix-card__title')
-                        cat_price = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__footer> .bigtix-price-display > b')
-                        print(cat_name.text + cat_price.text)
-                # 3.1 get list of category - END
-
                 # 3.2 click desired category - START
+                        
+                # if config_dict["area_auto_select"]["enable"]:
+                        # for tixcraft
+                bms_area_auto_select(driver, url, config_dict)
+                # polygon08 = driver.find_element(By.CSS_SELECTOR, 'polygon#area-08')
+                # polygon08.click()
+
+                # driver.close()
+                        # tixcraft_dict["area_retry_count"]+=1
+                        #print("count:", tixcraft_dict["area_retry_count"])
+                        # if tixcraft_dict["area_retry_count"] >= (60 * 15):
+                            # Cool-down
+                            # tixcraft_dict["area_retry_count"] = 0
+                            # time.sleep(5)
                 # 3.2 click desired category - END
                     
                 # 3.3 click desired category - START
                 # 3.3 click desired category - END
+
+                # 3.4 click 'confirm seats' - START
+                # If horizontal view
+                try:
+                    if _auto_press_next_step_button is True:
+                        confirm_seats_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-pagenav-next-container > button')
+                        if "bigtix-button--disabled"  not in confirm_seats_btn.get_attribute('class'):
+                            confirm_seats_btn.click()
+                except Exception as exc:
+                    pass
+                # If veritcal view
+                try:
+                    if _auto_press_next_step_button is True:
+                        confirm_slction_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-maphandler-confirm > button')
+                        if "bigtix-button--disabled"  not in confirm_slction_btn.get_attribute('class'):
+                            confirm_slction_btn.click()
+                except Exception as exc:
+                    pass
+                # 3.4 click 'confirm seats' - END
             except Exception as exc:
                 print("find .bigtix-booking-category-fulllist fail")
+
+    # https://my.bookmyshow.com/checkout
+    # if ('/checkout' in url) and (not '/patron' in url) and (not '/payment' in url):
+    if len(parsed_split_paths) == 1 and parsed_split_paths[0] == 'checkout':
+        # 4.1 checkout - START
+        if _auto_press_next_step_button is True:
+            # If horizontal view
+            try:
+                checkout_affix_btn = driver.find_element(By.CSS_SELECTOR, 'button.bigtix-checkout_shopping_cart_sticky_checkout_card_next_button')
+                if "bigtix-button--disabled" not in checkout_affix_btn.get_attribute('class'):
+                    checkout_affix_btn.click()
+            except Exception as exc:
+                pass
+
+            # If veritcal view
+            try:
+                checkout_next_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-pagenav-next-container > button')
+                if "bigtix-button--disabled" not in checkout_next_btn.get_attribute('class'):
+                    checkout_next_btn.click()
+            except Exception as exc:
+                pass
+        # 4.1 checkout - END
+    
+    # https://my.bookmyshow.com/checkout/patron
+    # if '/checkout/' and '/patron' in url:
+    if len(parsed_split_paths) == 2 and parsed_split_paths[0] == 'checkout' and parsed_split_paths[1] == 'patron':
+        if _auto_fill_patron_enable is True:
+            try:
+                # 5.1 input name - START
+                if _auto_fill_patron_name != "":
+                    name_input_query = '#bigtix-formitem__patronInfo-field--fullName > input'
+                    assign_text(driver, By.CSS_SELECTOR, name_input_query, str(_auto_fill_patron_name))
+                # 5.1 input name - END
+
+                # 5.2 input email - START
+                if _auto_fill_patron_email != "":
+                    email_input_query = '#bigtix-formitem__patronInfo-field--email > input'
+                    assign_text(driver, By.CSS_SELECTOR, email_input_query, str(_auto_fill_patron_email))
+                # 5.2 input email - END
+
+                # # 5.3 input phone - START
+                try:
+                    if _auto_fill_patron_ph_country != "":
+                        ph_country_input_query = '.bigtix-patroninfo-phone__country > div > span > input'
+                        ph_country_value_query = '.bigtix-patroninfo-phone__country > div > span:last-child'
+                        ph_country_input = driver.find_element(By.CSS_SELECTOR, ph_country_input_query)
+                        ph_country_value = driver.find_element(By.CSS_SELECTOR, ph_country_value_query)
+                        if ph_country_input.is_enabled() and ph_country_value.text.lower() != _auto_fill_patron_ph_country.lower():
+                            ph_country_input.click()
+                            if _auto_fill_patron_ph_country != "":
+                                assign_text(driver, By.CSS_SELECTOR, ph_country_input_query, str(_auto_fill_patron_ph_country))
+                                ph_country_input.send_keys(Keys.ENTER)
+                except Exception as exc:
+                    print("find phone country input fail")
+
+                if _auto_fill_patron_ph_no != "":
+                    ph_no_input_query = 'input.bigtix-patroninfo-phone__number'
+                    assign_text(driver, By.CSS_SELECTOR, ph_no_input_query, str(_auto_fill_patron_ph_no))
+                # # 5.3 input phone - END
+                
+                # 5.4 tick t&c - START
+                tnc_checkbox = driver.find_element(By.CSS_SELECTOR, 'label.bigtix-checkbox')
+                if "bigtix-checkbox--checked" not in tnc_checkbox.get_attribute('class'):
+                    tnc_checkbox.click()
+                # 5.4 tick tnc - END
+
+                # 5.5 click Confirm details - START
+                try:
+                    if _auto_press_next_step_button is True:
+                        confirm_dtls_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-pagenav-next-container > button')
+                        if "bigtix-button--disabled"  not in confirm_dtls_btn.get_attribute('class'):
+                            confirm_dtls_btn.click()
+                    
+                except Exception as exc:
+                    print("find confirm details btn fail")
+                # 5.5 click Confirm details - END
+
+            except Exception as exc:
+                print("find next btn fail")
 
     # Failed/Invalid cases:
 
     # https://my.bookmyshow.com/booking/IU24MYS/invalid
-    if '/booking/' and '/invalid' in url:
+    # if '/booking/' and '/invalid' in url:
+    if len(parsed_split_paths) == 3 and parsed_split_paths[0] == 'booking' and parsed_split_paths[2] == 'invalid':
         try:
             back_home_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-portal-error-page__button-primary')
             back_home_btn.click()
@@ -12372,7 +13070,8 @@ def bms_main(driver, url, config_dict, bms_dict):
             print("find .bigtix-booking-message-return fail")
 
     # https://my.bookmyshow.com/checkout/expired
-    if '/checkout/expired' in url:
+    # if '/checkout/expired' in url:
+    if len(parsed_split_paths) == 2 and parsed_split_paths[0] == 'checkout' and parsed_split_paths[1] == 'expired':
         try:
             back_home_btn = driver.find_element(By.CSS_SELECTOR, '.bigtix-booking-message-return')
             back_home_btn.click()
@@ -12664,6 +13363,8 @@ def main(args):
         # for my.bookmyshow.com
         bms_family = False
         if 'my.bookmyshow.com' in url:
+            bms_family = True
+        if 'bigtix.io' in url:
             bms_family = True
         if 'sg.bookmyshow.com' in url:
             bms_family = True

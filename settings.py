@@ -682,6 +682,18 @@ def get_default_config():
     config_dict['tixcraft']={}
     config_dict["tixcraft"]["pass_date_is_sold_out"] = True
     config_dict["tixcraft"]["auto_reload_coming_soon_page"] = True
+    
+    config_dict['bms']={}
+    config_dict["bms"]["pass_date_is_sold_out"] = True
+    config_dict["bms"]["auto_reload_coming_soon_page"] = True
+    config_dict["bms"]["auto_press_next_step_button"] = True
+    config_dict["bms"]["auto_fill_ticket_number"] = True
+    config_dict["bms"]["auto_fill_patron"] = {}
+    config_dict["bms"]["auto_fill_patron"]["enable"] = True
+    config_dict["bms"]["auto_fill_patron"]["name"] = ""
+    config_dict["bms"]["auto_fill_patron"]["email"] = ""
+    config_dict["bms"]["auto_fill_patron"]["ph_country"] = ""
+    config_dict["bms"]["auto_fill_patron"]["ph_no"] = ""
 
     config_dict['advanced']={}
 
