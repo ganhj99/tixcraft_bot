@@ -12390,7 +12390,7 @@ def get_bms_target_area(driver, cat_list_div, config_dict, area_keyword_item):
             return
         
         try:
-            area_list = driver.find_elements(By.CSS_SELECTOR, 'g#layer-overview > polygon:not(.bigtix-overview-map__area-hidden)')
+            area_list = driver.find_elements(By.CSS_SELECTOR, 'g#layer-overview > .bigtix-overview-map__area:not(.bigtix-overview-map__area-hidden)')
             #     if not "bigtix-card--disabled" in cat_div.get_attribute('class') :
             #         cat_name = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__body> .bigtix-card__main > .bigtix-card__title')
             #         cat_price = cat_div.find_element(By.CSS_SELECTOR, '.bigtix-card__content > .bigtix-card__footer> .bigtix-price-display > b')
